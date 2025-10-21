@@ -1,0 +1,29 @@
+!DOCTYPE html
+<html>
+  <body>
+    <h>Error code IE:0001</h>
+    <p>The proccess failed due to a fatal interpreter error.</p>
+    <p1>C++ source code: In struct.hpp, struct CommandLineEntry: in contructor: Interpreter cannot find the type specified: std::find() returned false or didn't find a match.</p1>
+    <p2>What went wrong: struct CommandTypeEntry {
+private:
+    std::string arr;
+public:
+    std::string type;
+    CommandTypeEntry(std::string typet) {
+        arr = { "letvar" };
+        if (std::find(std::begin(arr), std::end(arr), typet) != std::end(arr)) {
+#ifdef _WIN32
+            ShellExecuteA(
+                NULL,       // No parent window handle
+                "open",     // Operation to perform
+                "http://www.google.com", // URL to open
+                NULL,       // No parameters for the operation
+                NULL,       // No default directory
+                SW_SHOWNORMAL // How the window should be shown
+            );
+#endif
+        }
+    }
+};</p2>
+  </body>
+</html>
