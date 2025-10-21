@@ -4,26 +4,28 @@
     <h>Error code IE:0001</h>
     <p>The proccess failed due to a fatal interpreter error.</p>
     <p1>C++ source code: In struct.hpp, struct CommandLineEntry: in contructor: Interpreter cannot find the type specified: std::find() returned false or didn't find a match.</p1>
-    <p2>What went wrong: struct CommandTypeEntry {
-private:
-    std::string arr;
-public:
-    std::string type;
-    CommandTypeEntry(std::string typet) {
-        arr = { "letvar" };
-        if (std::find(std::begin(arr), std::end(arr), typet) != std::end(arr)) {
-#ifdef _WIN32
-            ShellExecuteA(
-                NULL,       // No parent window handle
-                "open",     // Operation to perform
-                "http://www.google.com", // URL to open
-                NULL,       // No parameters for the operation
-                NULL,       // No default directory
-                SW_SHOWNORMAL // How the window should be shown
-            );
-#endif
+    <button id="download" type="button">Download what want wrong</button>
+    <script>
+        document.getElementById("download").addEventListener("click", function() {
+            var inputtext = document.getElementById("input").value      
+            var filename = "DUMMY.TXT"
+            saveFile(inputtext, filename)
+        }, false)
+        function saveFile(contents, filename) {
+            var filename_ = filename || "DUMMY.TXT"
+            var blob = new Blob([ contents ], { "type": "text/plain" })
+            var msSaveBlob = window.navigator.msSaveBlob
+            if (msSaveBlob) {
+                msSaveBlob(blob, filename)
+            } else {
+                var a = document.createElement("a")
+                a.href = URL.createObjectURL(blob)
+                a.target = "_blank"
+                a.download = filename
+                a.click()
+                URL.revokeObjectURL(a.href)
+            }
         }
-    }
-};</p2>
+    </script>
   </body>
 </html>
