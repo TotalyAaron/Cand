@@ -1,0 +1,22 @@
+struct CommandTypeEntry {
+private:
+    std::string arr;
+public:
+    std::string type;
+    CommandTypeEntry(std::string typet) {
+        arr = { "letvar" };
+        if (std::find(std::begin(arr), std::end(arr), typet) != std::end(arr)) {
+#ifdef _WIN32
+            ShellExecuteA(
+                NULL,       // No parent window handle
+                "open",     // Operation to perform
+                "https://totalyaaron.github.io/STD-Docs/IE0001/", // URL to open
+                NULL,       // No parameters for the operation
+                NULL,       // No default directory
+                SW_SHOWNORMAL // How the window should be shown
+            );
+#endif
+        }
+    }
+};
+// this failed (the std::find != std::end()) or returned false, which means the interpreter was passing a invalid typet.
