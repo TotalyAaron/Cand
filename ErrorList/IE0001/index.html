@@ -7,7 +7,7 @@
     <button id="download" type="button">Download what went wrong</button>
     <script>
       document.getElementById("download").addEventListener("click", function() {
-        const fileUrl = "https://raw.githubusercontent.com/totalyaaron/STD-Docs/main/IE0001/DUMMY.TXT";
+        const fileUrl = "https://raw.githubusercontent.com/totalyaaron/STD-Docs/main/ErrorList/IE0001/DUMMY.TXT";
         fetch(fileUrl)
           .then(response => response.blob())
           .then(blob => {
