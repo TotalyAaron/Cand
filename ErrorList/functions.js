@@ -1,25 +1,26 @@
-async function checkDirectoryExists(owner, repo, directoryPath, token) {
+async function checkDirectoryExists(owner, repo, directoryPath, token = null) {
   const url = `https://api.github.com/repos/${owner}/${repo}/contents/${directoryPath}`;
+  const headers = {
+    'Accept': 'application/vnd.github.v3+json'
+  };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
   try {
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `token ${token}`,
-        'Accept': 'application/vnd.github.v3+json'
-      }
-    });
+    const response = await fetch(url, { headers });
     if (response.status === 200 || response.status === 403) {
-      console.log("Directory exists.");
+      console.log("Directory exists");
       return [true, response.status];
     } else if (response.status === 404) {
-      console.log("Directory ", directoryPath, " does not exist.");
+      console.log("Directory", directoryPath, "does not exist");
       return [false, response.status];
     } else {
-      console.error("Error checking directory: ", response.status, response.statusText);
+      console.error("Error checking directory:", response.status, response.statusText);
       return [false, response.status];
     }
   } catch (error) {
-    console.error("Network or other error: ", error);
-    return [false, response.status];
+    console.error("Network or other error:", error);
+    return [false, null];
   }
 }
 function searchEventHandler() {
@@ -31,11 +32,17 @@ function searchEventHandler() {
       const owner = "TotalyAaron";
       const repo = "Cand";
       const directoryPath = "ErrorList/" + input;
-      const githubToken = 'YOUR_GITHUB_PERSONAL_ACCESS_TOKEN';
+      const githubToken = null;
       checkDirectoryExists(owner, repo, directoryPath, githubToken)
-        .then([exists, errcode] => {
+        .then(([exists, errcode]) => {
           if (exists) {
+            window.location.href = "https://totalyaaron.github.io/Cand/ErrorList/" + input;
           } else {
+            const cplaceholder = searchInterpreterElement.placeholder;
+            searchInterpreterElement.placeholder = "Cannot find error code '" + input + "'.";
+            setTimeout(() => {
+              searchInterpreterElement.placeholder = cplaceholder
+            }, 2000);
           }
       });
     }
