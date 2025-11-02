@@ -13,11 +13,33 @@
       #ErrorButton:hover {
         background-color: #DD3333;
       }
+      #DownloadButton {
+        background-color: #FFFFC5;
+      }
+      #DownloadButton:hover {
+        background-color: #AA5555;
+      }
+      #DownloadButton img {
+        opacity: 0.3;
+        transition: opacity 0.4s ease;
+      }
+      #DownloadButton:hover img {
+        opacity: 0.9;
+      }
+      .middle {
+        text-align: center;
+      }
     </style>
   </head>
   <body>
     <h1 id="headerone">Welcome to the official C& programming language website!</h1>
-    <button id="ErrorButton" onclick="gotoerrlist()">Error list</button>
+    <div class="middle">
+      <button id="ErrorButton" onclick="gotoerrlist()">Error list</button>
+      <button id="DownloadButton" onclick="gotodownload()">
+        <image src="ca.png" alt="Button"></image>
+        Download C&
+      </button>
+    </div>
     <script src="functions.js"></script>
   </body>
 </html>
