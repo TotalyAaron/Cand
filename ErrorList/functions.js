@@ -28,9 +28,9 @@ function searchEventHandler() {
     if (event.key === "Enter") {
       console.log("Enter key pressed:", event.target.value);
       const input = searchInterpreterElement.value;
-      const owner = 'octocat'; // Replace with the repository owner
-      const repo = 'Spoon-Knife'; // Replace with the repository name
-      const directoryPath = 'src'; // Path to the directory to check
+      const owner = "TotalyAaron";
+      const repo = "Cand";
+      const directoryPath = "ErrorList/" + input;
       const githubToken = 'YOUR_GITHUB_PERSONAL_ACCESS_TOKEN';
       checkDirectoryExists(owner, repo, directoryPath, githubToken)
         .then([exists, errcode] => {
