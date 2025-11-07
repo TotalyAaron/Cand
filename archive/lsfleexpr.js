@@ -31,7 +31,19 @@ async function loadDir(path = "") {
         }
       });
     } else {
-      li.innerHTML = `<a class="file" href="${item.download_url}" download>${item.name}</a>`;
+      li.innerHTML = `<button class="file-download">${item.name}</button>`;
+      li.querySelector(".file-download").addEventListener("click", async () => {
+      const response = await fetch(item.download_url);
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = item.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    });
     }
     ul.appendChild(li);
   }
