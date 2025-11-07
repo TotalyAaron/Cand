@@ -38,7 +38,7 @@ async function loadDir(path = "") {
   return { element: ul, hasContent: true };
 }
 (async () => {
-  const root = await loadDir("archive");
+  const root = await loadDir("archive/builds");
   const container = document.getElementById("repo");
   if (root.hasContent) {
     container.appendChild(root.element);
