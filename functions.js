@@ -6,3 +6,7 @@ function gotodownload() {
   window.location.href = "https://totalyaaron.github.io/Cand/archive";
   return;
 }
+function gotosettings() {
+  window.location.href = "https://totalyaaron.github.io/Cand/settings";
+  return;
+}
