@@ -15,18 +15,14 @@
         background-color: #DD3333;
       }
       #DownloadButton {
+        background-image: url('ca.png');
+        background-size: contain;
+        background-repeat: no-repeat;
+        background-position: center;
         background-color: #FFFFC5;
       }
       #DownloadButton:hover {
         background-color: #AA5555;
-      }
-      #DownloadButton img {
-        max-width: 100%;
-        opacity: 0.3;
-        transition: opacity 0.4s ease;
-      }
-      #DownloadButton:hover img {
-        opacity: 0.9;
       }
       .middle {
         text-align: center;
@@ -38,7 +34,6 @@
     <div class="middle">
       <button id="ErrorButton" onclick="gotoerrlist()">Error list</button>
       <button id="DownloadButton" onclick="gotodownload()">
-        <img src="ca.png" alt=""></img>
         Download C&
       </button>
     </div>
