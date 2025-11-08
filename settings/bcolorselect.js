@@ -1,4 +1,4 @@
-void refreshColor() {
+function refreshColor() {
   let bcolor = localStorage.getItem("bcolor");
   document.body.style.backgroundColor = bcolor;
   return;
