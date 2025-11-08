@@ -10,6 +10,7 @@ function gotosettings() {
   window.location.href = "https://totalyaaron.github.io/Cand/settings";
   return;
 }
+// background color
 function refreshColor() {
   let bcolor = localStorage.getItem("bcolor");
   document.body.style.backgroundColor = bcolor;
@@ -18,3 +19,12 @@ function refreshColor() {
 document.addEventListener("DOMContentLoaded", () => {
   refreshColor();
 });
+// slide logic
+const slides = document.querySelectorAll(".slide");
+// show a specific image by index
+function showSlide(index) {
+  slides.forEach((slide, i) => {
+    slide.classList.toggle("active", i === index);
+  });
+  return;
+}
