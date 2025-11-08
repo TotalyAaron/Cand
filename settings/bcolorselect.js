@@ -1,6 +1,7 @@
 function refreshColor() {
   let bcolor = localStorage.getItem("bcolor");
   document.body.style.backgroundColor = bcolor;
+  alert(bcolor, "   ", document.body.style.backgroundColor);
   return;
 }
 document.addEventListener("DOMContentLoaded", () => {
