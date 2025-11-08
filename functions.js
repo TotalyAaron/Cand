@@ -32,3 +32,9 @@ function showSlide(index) {
 const buttons = document.getElementById("buttons");
 const errorlb = buttons.querySelector("#ErrorButton");
 const downloadlb = buttons.querySelector("#DownloadButton");
+errorlb.addEventListener("mouseenter", () => {
+  showSlide(0);
+});
+downloadlb.addEventListener("mouseenter", () => {
+  showSlide(1);
+});
