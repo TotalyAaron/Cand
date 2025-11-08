@@ -48,3 +48,11 @@ function searchEventHandler() {
     }
   });
 }
+void refreshColor() {
+  let bcolor = localStorage.getItem("bcolor");
+  document.body.style.backgroundColor = bcolor;
+  return;
+}
+document.addEventListener("DOMContentLoaded", () => {
+  refreshColor();
+});
