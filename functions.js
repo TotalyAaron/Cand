@@ -29,4 +29,6 @@ function showSlide(index) {
   return;
 }
 // listeners
-const errorlistb = document.getElementById("errorlist");
+const buttons = document.getElementById("buttons");
+const errorlb = buttons.querySelector("#ErrorList");
+const downloadlb = buttons.querySelector("#Download");
