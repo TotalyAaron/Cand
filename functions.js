@@ -43,8 +43,11 @@ downloadlb.addEventListener("mouseenter", () => {
   let img = document.createElement("img");
   img.src = "ca.png";
   img.id = "caimgp2";
+  img.style.width = "50px";
+  img.style.height = "50px";
+  stitle.appendChild(img);
 });
 downloadlb.addEventListener("mouseleave", () => {
-  let img = document.getElementById("caimgp2");
+  let img = stitle.querySelector("$caimgp2");
   if (img) img.parentNode.removeChild(img);
 });
