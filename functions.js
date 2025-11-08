@@ -10,3 +10,11 @@ function gotosettings() {
   window.location.href = "https://totalyaaron.github.io/Cand/settings";
   return;
 }
+void refreshColor() {
+  let bcolor = localStorage.getItem("bcolor");
+  document.body.style.backgroundColor = bcolor;
+  return;
+}
+document.addEventListener("DOMContentLoaded", () => {
+  refreshColor();
+});
