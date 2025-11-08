@@ -1,12 +1,11 @@
 function refreshColor() {
   let bcolor = localStorage.getItem("bcolor");
   document.body.style.backgroundColor = bcolor;
-  alert(bcolor, "   ", document.body.style.backgroundColor);
   return;
 }
 document.addEventListener("DOMContentLoaded", () => {
   const select = document.getElementById("bcolorselect");
-  select.addEventListener("select", function() {
+  select.addEventListener("change", function() {
     localStorage.setItem("bcolor", this.value);
     refreshColor();
   });
