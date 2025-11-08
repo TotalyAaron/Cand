@@ -7,6 +7,14 @@
     <button id="download" type="button">Download what went wrong</button>
     <a href="https://totalyaaron.github.io/Cand/ErrorList"><br>Go back to error list</a>
     <script>
+      void refreshColor() {
+        let bcolor = localStorage.getItem("bcolor");
+        document.body.style.backgroundColor = bcolor;
+        return;
+      }
+      document.addEventListener("DOMContentLoaded", () => {
+        refreshColor();
+      });
       document.getElementById("download").addEventListener("click", function() {
         const fileUrl = "https://raw.githubusercontent.com/totalyaaron/STD-Docs/main/ErrorList/IE0001/DUMMY.TXT";
         fetch(fileUrl)
