@@ -30,5 +30,5 @@ function showSlide(index) {
 }
 // listeners
 const buttons = document.getElementById("buttons");
-const errorlb = buttons.querySelector("#ErrorList");
-const downloadlb = buttons.querySelector("#Download");
+const errorlb = buttons.querySelector("#ErrorButton");
+const downloadlb = buttons.querySelector("#DownloadButton");
