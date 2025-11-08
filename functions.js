@@ -28,3 +28,5 @@ function showSlide(index) {
   });
   return;
 }
+// listeners
+const errorlistb = document.getElementById("errorlist");
