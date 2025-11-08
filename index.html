@@ -30,6 +30,24 @@
       .warning {
         color: yellow;
       }
+      .slider {
+        position: relative;
+        width: 300px;
+        height: 200px;
+        overflow: hidden;
+      }
+      .slide {
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        left: 0;
+        top: 0;
+        opacity: 0;
+        transition: opacity 0.5s ease-in-out;
+      }
+      .slide.active {
+        opacity: 1;
+      }
     </style>
   </head>
   <body>
@@ -41,7 +59,14 @@
       </button>
       <button id="settingsbutton" onclick="gotosettings()">Settings</button>
     </div>
-    <p1 class="warning">Warning: C& is an unfinished project and will be in the near future.</p1>
+    <p1 class="warning">Warning: C& is an unfinished project and will be in the near future.<br></p1>
+    <p2 id="stitle"></p2>
+    <br>
+    <div class="slider">
+      <img src="error.png" class="slide">
+      <img src="C&.png" class="slide">
+      <img src="settings.png" class="slide">
+    </div>
     <script src="functions.js"></script>
   </body>
 </html>
