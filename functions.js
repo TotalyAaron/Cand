@@ -35,7 +35,7 @@ const errorlb = buttons.querySelector("#ErrorButton");
 const downloadlb = buttons.querySelector("#DownloadButton");
 errorlb.addEventListener("mouseenter", () => {
   showSlide(0);
-  stitle.textContent = "Search for errors that you may encounter here.");
+  stitle.textContent = "Search for errors that you may encounter here.";
 });
 downloadlb.addEventListener("mouseenter", () => {
   showSlide(1);
@@ -48,6 +48,6 @@ downloadlb.addEventListener("mouseenter", () => {
   stitle.appendChild(img);
 });
 downloadlb.addEventListener("mouseleave", () => {
-  let img = stitle.querySelector("$caimgp2");
+  let img = stitle.querySelector("#caimgp2");
   if (img) img.parentNode.removeChild(img);
 });
