@@ -58,7 +58,7 @@ async function loadDir(path = "") {
     container.innerHTML = "<p><em>No archive of C& found.</em></p>";
   }
 })();
-void refreshColor() {
+function refreshColor() {
   let bcolor = localStorage.getItem("bcolor");
   document.body.style.backgroundColor = bcolor;
   return;
