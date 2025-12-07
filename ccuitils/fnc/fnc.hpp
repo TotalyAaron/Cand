@@ -64,17 +64,27 @@ static bool isValidVariableName(const std::string &name)
     }
     return true;
 }
+struct ParsedType
+{
+    llvm::Type *llvmType;    // the real pointer type
+    llvm::Type *pointeeType; // nullptr if not a pointer
+};
 static Type *checkForDataType_Declaration(std::string dataType, LLVMContext &ctx)
 {
     ltrim(dataType);
-    if (dataType.back() == '*')
+    rtrim(dataType);
+    if (dataType.empty())
+        return nullptr; // invalid like "***"
+    // Handle pointer types (chain as many * as needed)
+    if (!dataType.empty() && dataType.back() == '*')
     {
         std::string base = dataType.substr(0, dataType.size() - 1);
         Type *baseTy = checkForDataType_Declaration(base, ctx);
-        if (baseTy == nullptr)
+        if (!baseTy)
             return nullptr;
         return PointerType::getUnqual(baseTy);
     }
+    // Primitive types
     if (dataType == "int1" || dataType == "bool")
         return Type::getInt1Ty(ctx);
     else if (dataType == "int8")
@@ -88,14 +98,15 @@ static Type *checkForDataType_Declaration(std::string dataType, LLVMContext &ctx
     else if (dataType == "int128")
         return Type::getInt128Ty(ctx);
     else if (dataType == "float32")
-        return Type::getFloatTy(ctx); // (getFloat32Ty)
+        return Type::getFloatTy(ctx);
     else if (dataType == "float64")
-        return Type::getDoubleTy(ctx); // (getFloat64Ty)
+        return Type::getDoubleTy(ctx);
+
     if (W > 1)
-    {
-        std::cout << "Warning: Invalid data type '" << dataType << "'. Defaulting to int1 (boolean).\n";
-    }
-    return Type::getInt1Ty(ctx); // nothing, invalid type
+        std::cout << "Warning: Invalid data type '" << dataType
+                  << "'. Defaulting to int1.\n";
+
+    return Type::getInt1Ty(ctx);
 }
 class FNCPrivateUtils
 {
@@ -146,63 +157,87 @@ static int ParseFnc(const std::string &line, LLVMContext &ctx, Module &module, I
         // std::cout << "Return value: " << match[3] << "\n";
         /* Parsing the input */
         /// Arguments
-        std::vector<std::string> args = FNCPrivateUtils::split(std::string(match[2]), ',');
-        std::unordered_map<std::string, Type *> parameters = {};
-        for (std::string &arg : args)
+        // --- parse args preserving order ---
+        std::vector<std::string> rawArgs = FNCPrivateUtils::split(std::string(match[2]), ',');
+        std::vector<llvm::Type *> paramTypes;                        // in-order LLVM types for FunctionType
+        std::vector<std::string> paramNames;                         // in-order parameter names
+        std::vector<std::pair<std::string, std::string>> parsedArgs; // (typeStr, nameStr) for later reuse
+        for (auto &raw : rawArgs)
         {
-            arg = trim(arg);
-            std::vector<std::string> tokens = FNCPrivateUtils::parseParameterLine(arg);
-            Type *data_type = checkForDataType_Declaration(tokens[0], ctx);
-            std::cout << tokens[1] << std::endl;
-            if (!isValidVariableName(tokens[1]))
+            std::string arg = trim(raw); // keep your trim helper
+            if (arg.empty())
+                continue; // skip empty slots (e.g. no args)
+            auto tokens = FNCPrivateUtils::parseParameterLine(arg);
+            std::string typeStr = tokens[0];
+            std::string nameStr = tokens[1];
+            // validate name
+            if (!isValidVariableName(nameStr))
             {
                 throw std::exception("Variable name contains illegal characters.");
             }
-            auto /* std::pair<std::iterator<..>, bool> */ success = parameters.insert({tokens[1], data_type});
-            if (!success.second)
+            // Resolve the type (this returns the LLVM Type* for "int32" or "int32*" etc)
+            Type *resolved = checkForDataType_Declaration(typeStr, ctx);
+            if (!resolved)
             {
-                if (W > 1)
-                {
-                    if (WError) {
-                        std::string err = "Repeated argument name at function '" + std::string(match[1]) + "', argument '" + arg + "'.";
-                        throw std::exception(err.c_str());
-                    }
-                    std::cout << "Warning: Repeated argument found at function '" << match[2] << "', argument '" << arg << "', skipped insertion of argument.\n";
-                }
+                std::string err = "Unknown type for parameter '" + nameStr + "' in function '" + std::string(match[1]) + "'";
+                throw std::exception(err.c_str());
             }
+            // push into ordered lists
+            paramTypes.push_back(resolved);
+            paramNames.push_back(nameStr);
+            parsedArgs.push_back({typeStr, nameStr});
         }
-        // Get all data types
-        std::vector<Type *> allTypes = {};
-        for (const std::pair<std::string, Type *> &pair : parameters)
-        {
-            allTypes.push_back(pair.second);
-        }
-        // Get all parameter names
-        std::vector<std::string> allParameterNames = {};
-        for (const std::pair<std::string, Type *> &pair : parameters)
-        {
-            allParameterNames.push_back(pair.first);
-        }
-        // Add the function
-        Type *return_data_type = !std::string(match[3]).empty() ? checkForDataType_Declaration(std::string(match[3]), ctx) : Type::getVoidTy(ctx) /* returns nothing if well... no return value duh */;
-        FunctionType *fnctype = FunctionType::get(return_data_type, allTypes, false);
+        Type *returnType = !std::string(match[3]).empty()
+                               ? checkForDataType_Declaration(std::string(match[3]), ctx)
+                               : Type::getVoidTy(ctx);
+        if (!returnType)
+            throw std::exception("Invalid return type.");
+
+        FunctionType *fnctype = FunctionType::get(returnType, paramTypes, false);
         Function *function = Function::Create(fnctype, Function::ExternalLinkage, Twine(match[1]), module);
         currentFunction = function;
-        // Set the builder's insert point so it actually knows where to go :skull:, spent hours tryin to figure out why the alloca is scatte/aring everywhere
+        // Set up entry block and builder
         BasicBlock *entry = BasicBlock::Create(ctx, "entry", function);
         builder.SetInsertPoint(entry);
-        int args_iterator_index = 0;
+        // push a new scope for parameters
+        variables.push_back({});
+        // Assign arg names and create allocas *in the same order as paramNames*
+        size_t idx = 0;
         for (Argument &arg : function->args())
         {
-            arg.setName(allParameterNames[args_iterator_index]);
-            // Create an alloca for the parameter
-            AllocaInst *alloca = allocate_variable(function, arg.getType(), arg.getName().str()); //builder.CreateAlloca(arg.getType(), nullptr, arg.getName().str());
-            // Store initial parameter value into the alloca
+            arg.setName(paramNames[idx]);
+            // allocate a stack slot for the parameter (use the declared LLVM type)
+            AllocaInst *alloca = allocate_variable(function, arg.getType(), arg.getName().str());
+            // store the incoming argument value into the alloca
             builder.CreateStore(&arg, alloca);
-            // Register this alloca inside variable table
-            variables[arg.getName().str()] = alloca;
-            args_iterator_index++;
+            VariableInfo info;
+            Type *declType = arg.getType(); // full LLVM type (may be pointer, pointer-of-pointer, ...)
+            if (declType->isPointerTy())
+            {
+                // derive pointee type from the parsed source text, not from LLVM pointer (opaque)
+                std::string typeStr = parsedArgs[idx].first;
+
+                // remove trailing '*' characters to get base type
+                while (!typeStr.empty() && typeStr.back() == '*')
+                    typeStr.pop_back();
+                Type *pointee = checkForDataType_Declaration(typeStr, ctx);
+                if (!pointee)
+                {
+                    throw std::exception("Cannot resolve pointee type for parameter.");
+                }
+                info = VariableInfo(declType, pointee, alloca);
+            }
+            else
+            {
+                // non-pointer
+                info = VariableInfo(declType, alloca);
+            }
+            // register under the actual parameter name
+            variables.back()[arg.getName().str()] = info;
+
+            ++idx;
         }
+
         return 0; // yayyy... took 2 days
     }
     return 1;

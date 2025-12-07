@@ -1,5 +1,3 @@
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
 #include "compiler.hpp"
 #include "caxml/caprojloader.hpp"
 #include <iostream>
@@ -7,12 +5,10 @@
 #include <filesystem>
 #include <fstream>
 using namespace llvm;
-Project *currentProject = nullptr;
 OptimizationLevel oplevel = OptimizationLevel::O3;
 llvm::Value *cand_eval::evaluateExpression(std::string expr, llvm::Type *type, llvm::Function *F, llvm::IRBuilder<> &builder, llvm::LLVMContext &ctx)
 {
     expr = trim(expr);
-    std::cout << "expr '" << expr << "'\n";
     std::pair<bool, double> isSingleVal = cand_eval::IsSingleValue(expr);
     if (isSingleVal.first)
     {
@@ -41,7 +37,8 @@ llvm::Value *cand_eval::evaluateExpression(std::string expr, llvm::Type *type, l
     llvm::Value *val = generateIR(root.get(), F, builder);
     return val;
 }
-std::string removeComments(const std::string& code) {
+std::string removeComments(const std::string &code)
+{
     static const std::regex singleLine(R"(//[^\n]*)");
     static const std::regex multiLine(R"(/\*[\s\S]*?\*/)");
     std::string result = std::regex_replace(code, singleLine, "");
@@ -75,7 +72,23 @@ int ProjectMode(std::string path)
         }
         if (parts[0] == "build")
         {
-            std::cout << "Build not avalible at the moment.\n";
+            // std::cout << "Build not avalible at the moment.\n";
+            if (currentProject == nullptr)
+            {
+                std::cout << "Cannot load project!\n";
+                continue;
+            }
+            int errc;
+            try
+            {
+                errc = compile(currentProject->program.SourceFilename, currentProject->program.optimizationLevel, currentProject->program.outputPath, currentProject->program.mode);
+            }
+            catch (const std::exception &e)
+            {
+                std::cout << "Error when compiling: " << e.what() << "\n";
+                errc = 1;
+            }
+            std::cout << "[STATUS] Compile exited with error code " << errc << ".\n";
             continue;
         }
         else if (parts[0] == "exitproj")
@@ -152,10 +165,12 @@ int MainLoop()
             return 0;
         }
         int errc;
-        try {
+        try
+        {
             errc = compile(parts[1], oplevel, parts[2], parts[3]);
         }
-        catch (const std::exception& e) {
+        catch (const std::exception &e)
+        {
             std::cout << "Error when compiling: " << e.what() << "\n";
             errc = 1;
         }
@@ -164,8 +179,12 @@ int MainLoop()
     }
     else if (parts[0] == "allVars")
     {
-        for (std::pair<std::string, llvm::AllocaInst*> alloca : variables) {
-            std::cout << alloca.second->getName().str() << "\n";
+        for (auto &scope : variables)
+        {
+            for (std::pair<std::string, VariableInfo> alloca : scope)
+            {
+                std::cout << alloca.second.allocaInst->getName().str() << "\n";
+            }
         }
         return 0;
     }
@@ -192,4 +211,3 @@ int main()
     }
     return 0;
 }
-#pragma clang diagnostic pop

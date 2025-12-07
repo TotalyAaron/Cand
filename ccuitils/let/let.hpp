@@ -29,24 +29,36 @@ static int ParseLet(const std::string &line, LLVMContext &ctx, Module &module, I
     std::smatch match;
     if (std::regex_match(line, match, pattern))
     {
-        //std::cout << "First token: " << match[1] << "\n";
-        //std::cout << "Second token: " << match[2] << "\n";
-        //std::cout << "Right-hand side: " << match[3] << "\n";
+        // std::cout << "First token: " << match[1] << "\n";
+        // std::cout << "Second token: " << match[2] << "\n";
+        // std::cout << "Right-hand side: " << match[3] << "\n";
         Type *type = checkForDataType_Declaration(match[1], ctx);
-        if (!builder.GetInsertBlock())
-        {
-            throw std::exception("Cannot declare a variable in global scope.");
-        }
-        if (!isValidVariableName(match[2]))
-        {
-            throw std::exception("Variable name contains illegal characters.");
-        }
+        if (!type)
+            throw std::exception("Invalid type.");
         Function *fn = builder.GetInsertBlock()->getParent();
         AllocaInst *allocaInstance = allocate_variable(fn, type, match[2].str());
-        Value *variableValue = cand_eval::evaluateExpression(std::string(match[3]), type, fn, builder, ctx);
-        if (!variableValue) throw std::exception("Invalid expression.");
+        Value *variableValue =
+            cand_eval::evaluateExpression(match[3].str(), type, fn, builder, ctx);
+        if (!variableValue)
+            throw std::exception("Invalid expression.");
         builder.CreateStore(variableValue, allocaInstance);
-        variables[std::string(match[2])] = allocaInstance;
+        VariableInfo info;
+        if (type->isPointerTy())
+        {
+            // full type is 'type'
+            llvm::Type *baseType = nullptr;
+            // manually extract the base type because opaque pointers can't:
+            std::string t = match[1].str(); // "int32*""
+            while (!t.empty() && t.back() == '*')
+                t.pop_back();
+            baseType = checkForDataType_Declaration(t, ctx);
+            info = VariableInfo(type, baseType, allocaInstance);
+        }
+        else
+        {
+            info = VariableInfo(type, allocaInstance);
+        }
+        variables.back()[match[2].str()] = info;
         return 0; // didn't actually take me long
     }
     return 1;

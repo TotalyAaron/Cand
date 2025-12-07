@@ -24,8 +24,44 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/DerivedTypes.h>
+struct VariableInfo
+{
+    llvm::Type *type;        // The type of the variable (i32, i32*, i32**, etc.)
+    llvm::Type *pointeeType; // Only valid if type is a pointer (what *points to)
+    llvm::AllocaInst *allocaInst;
+    bool isPointer;
+    VariableInfo() : type(nullptr), pointeeType(nullptr),
+                     allocaInst(nullptr), isPointer(false) {}
 
-std::unordered_map<std::string, llvm::AllocaInst *> variables;
+    // Non-pointer
+    VariableInfo(llvm::Type *t, llvm::AllocaInst *al)
+        : type(t),
+          pointeeType(nullptr),
+          allocaInst(al),
+          isPointer(false) {}
+
+    // Pointer
+    VariableInfo(llvm::Type *fullPointerType, llvm::Type *elemType, llvm::AllocaInst *al)
+        : type(fullPointerType),
+          pointeeType(elemType),
+          allocaInst(al),
+          isPointer(true) {}
+};
+
+std::vector<std::unordered_map<std::string, VariableInfo>> variables; // scopes
+VariableInfo *lookup(const std::string &name)
+{
+    for (int i = variables.size() - 1; i >= 0; --i)
+    {
+        auto &scope = variables[i];
+        auto it = scope.find(name);
+        if (it != scope.end())
+        {
+            return &it->second;
+        }
+    }
+    return nullptr; // not found
+}
 
 #include "../caccfg.h"
 // #include "let.hpp"
@@ -306,7 +342,6 @@ namespace cand_eval
         std::unique_ptr<AST> parseMulDiv()
         {
             auto node = parsePrimary();
-            std::cout << "pp\n";
             while (true)
             {
                 if (match(TokenKind::Mul))
@@ -405,28 +440,26 @@ namespace cand_eval
     }
     // Find alloca by name inside function and return a loaded value
     llvm::Value *loadVariableByName(
-        llvm::Function* function,
+        llvm::Function *function,
         const std::string &name,
         llvm::IRBuilder<> &builder,
         llvm::Module &module)
     {
-        // lookup in  variable table
-        auto it = variables.find(name);
-        if (it != variables.end())
+        VariableInfo *info = lookup(name);
+        if (!info)
+            return nullptr;
+        llvm::Value *alloc = info->allocaInst;
+        if (llvm::AllocaInst *alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(alloc))
         {
-            llvm::Value *alloc = it->second;
-            if (llvm::AllocaInst *alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(alloc))
-            {
-                llvm::Type *loaded_type = alloca_inst->getAllocatedType();
-                return builder.CreateLoad(
-                    loaded_type,
-                    alloc,
-                    name + ".load");
-            }
-            else
-            {
-                return nullptr;
-            }
+            llvm::Type *loaded_type = info->type;
+            return builder.CreateLoad(
+                loaded_type,
+                alloc,
+                name + ".load");
+        }
+        else
+        {
+            return nullptr;
         }
         // fallback: global variable
         if (llvm::GlobalVariable *GV = module.getGlobalVariable(name))
@@ -436,7 +469,6 @@ namespace cand_eval
                 GV,
                 name + ".load");
         }
-        std::cout << "safdkjhasdfkjhadsfkjhadfs\n";
         throw_ca_err("Unknown variable: " + name);
         return nullptr;
     }
@@ -509,7 +541,6 @@ namespace cand_eval
     // IR generation from AST
     static llvm::Value *generateIR(AST *node, llvm::Function *F, llvm::IRBuilder<> &builder)
     {
-        std::cout << "Generating IR\n";
         if (err)
         {
             std::cout << "Error before IR generation: " << errMsg << "\n";
@@ -543,13 +574,12 @@ namespace cand_eval
                 if (op == '&')
                 {
                     std::string varName = node->right->name;
-                    std::cout << varName << "\n";
-                    std::cout << node->right->name << "\n";
                     return findVariableAlloca(currentFunction, varName);
                 }
-                /*if (op == '~')
+                if (op == '~')
                 {
-                    llvm::Value *ptr = generateIR(node->right.get(), F, builder);
+                    /*llvm::Value *ptr = generateIR(node->right.get(), F, builder);
+
                     llvm::AllocaInst *__alloca = dyn_cast<llvm::AllocaInst>(ptr);
                     if (!__alloca)
                     {
@@ -557,12 +587,25 @@ namespace cand_eval
                         return nullptr;
                     }
                     llvm::Type *elemTy = __alloca->getAllocatedType();
-                    return builder.CreateLoad(elemTy, ptr, "deref");
-                    if (!ptr->getType()->isPointerTy())
-                        throw_ca_err("Cannot dereference non-pointer");
-                    llvm::Type *elemTy = ptr->getType();
-                    return builder.CreateLoad(elemTy, ptr, "deref");
-                }*/
+                    return builder.CreateLoad(elemTy, ptr, "deref");*/
+                    std::string varName = node->right->name;
+                    VariableInfo *info = lookup(varName);
+                    if (!info)
+                    {
+                        throw_ca_err("Cannot dereference unknown variable/pointer.");
+                        return nullptr;
+                    }
+                    if (!info->isPointer)
+                    {
+                        throw_ca_err("Cannot dereference non-pointer value.");
+                        return nullptr;
+                    }
+                    // Load the pointer stored inside the alloca
+                    llvm::Value *loadedPtr =
+                        builder.CreateLoad(info->type, info->allocaInst, varName + ".ptr");
+                    // Use the manually-stored pointeeType
+                    return builder.CreateLoad(info->pointeeType, loadedPtr, varName + ".deref");
+                }
                 if (op == '-')
                 { // unary negation
                     llvm::Value *v = generateIR(node->right.get(), F, builder);

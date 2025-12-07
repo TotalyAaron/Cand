@@ -26,6 +26,7 @@
 #include <filesystem>
 #include <vector>
 #include "ccuitils/nkw/utils.hpp"
+#include "caxml/caprojloader.hpp"
 using namespace llvm;
 struct CACompileStatus
 {
@@ -40,23 +41,6 @@ struct CACompileStatus
             success = true;
     }
 };
-OptimizationLevel checkOptimizationLevel(std::string oplevel)
-{
-    if (oplevel == "O0")
-        return OptimizationLevel::O0;
-    else if (oplevel == "O1")
-        return OptimizationLevel::O1;
-    else if (oplevel == "02")
-        return OptimizationLevel::O2;
-    else if (oplevel == "O3")
-        return OptimizationLevel::O3;
-    else if (oplevel == "Os")
-        return OptimizationLevel::Os;
-    else if (oplevel == "Oz")
-        return OptimizationLevel::Oz;
-    else
-        return OptimizationLevel::O3;
-}
 int example()
 {
     LLVMContext ctx;
@@ -192,6 +176,16 @@ bool isWhitespace(const std::string &str)
     return std::all_of(str.begin(), str.end(), [](char c)
                        { return std::isspace(static_cast<unsigned char>(c)); });
 }
+
+/*
+INIT MODULE DATA
+*/
+
+void SetupModule(Module &module) {
+    if (currentProject == nullptr) return;
+    module.setSourceFileName(currentProject->program.SourceFilename);
+    module.setModuleIdentifier(currentProject->program.ModuleID);
+}
 /*
 C& COMPILER
 compile(filePath) -> return CACompileStatus
@@ -230,7 +224,7 @@ int compile(std::filesystem::path filePath, llvm::OptimizationLevel &oplevel, st
             allLines[i] = trim(allLines[i]);
             if (isWhitespace(allLines[i]))
                 continue;
-            std::cout << allLines[i] << "\n";
+            //std::cout << allLines[i] << "\n";
             if (ParseImportExtern(allLines[i], ctx, module, builder) == 0) continue;
             if (ParseGlobal(allLines[i], ctx, module, builder) == 0) continue;
             if (ParseLet(allLines[i], ctx, module, builder) == 0) continue;
@@ -253,7 +247,7 @@ int compile(std::filesystem::path filePath, llvm::OptimizationLevel &oplevel, st
             throw std::exception("Fatal error when linking: failed to verify module.");
         }
         optimizeModule(module, oplevel);
-        module.print(llvm::outs(), nullptr);
+        //module.print(llvm::outs(), nullptr);
         /*if (mod == "-o" || mod == "-obj")
         {
             //module.print(llvm::errs(), nullptr);
