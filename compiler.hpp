@@ -18,29 +18,14 @@
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/Orc/LLJIT.h>
 #include <llvm/ExecutionEngine/Orc/ThreadSafeModule.h>
-#include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/Error.h>
 #include <llvm/Bitcode/BitcodeWriter.h>
-#include <llvm/Support/FileSystem.h>
 #include <string>
 #include <filesystem>
 #include <vector>
 #include "ccuitils/nkw/utils.hpp"
 #include "caxml/caprojloader.hpp"
 using namespace llvm;
-struct CACompileStatus
-{
-    bool success;
-    std::string errorMessage;
-    int errorCode;
-    CACompileStatus(int errorCode, std::string errormsg) : errorCode(errorCode), errorMessage(errormsg)
-    {
-        if (errorCode != 0)
-            success = false;
-        else
-            success = true;
-    }
-};
 int example()
 {
     LLVMContext ctx;
@@ -138,6 +123,7 @@ EMIT ASSEMBLER
 
 bool emitAssembly(llvm::Module &module, const std::string &filename) {
     using namespace llvm;
+    outs() << "code >> " << filename << "\n";
     //InitializeNativeTarget();
     //InitializeNativeTargetAsmPrinter();
     InitializeNativeTargetAsmParser();
@@ -197,6 +183,7 @@ compile(filePath) -> return CACompileStatus
 #include "ccuitils/unrkw/curlybracet.hpp"
 #include "ccuitils/importextrn/importextrn.hpp"
 #include "ccuitils/global/global.hpp"
+#include "ccuitils/other/assign.hpp"
 /*
 PARSING
 */
@@ -234,11 +221,12 @@ int compile(std::filesystem::path filePath, llvm::OptimizationLevel &oplevel, st
                 if (ParseRet(allLines[i], currentFunction->getFunctionType()->getReturnType(), ctx, module, builder, currentFunction) == 0) continue;
             }
             if (ParseEndingCurlyBracet(allLines[i], ctx) == 0) continue;
+			if (ParseAssignment(allLines[i], ctx, module, builder) == 0) continue;
             llvm::Value *exprres = cand_eval::evaluateExpression(allLines[i], builder.getInt32Ty(), currentFunction, builder, ctx);
             if (exprres != nullptr)
                 continue;
             std::string errmsg = "Invalid line '" + std::string(allLines[i]) + "'";
-            throw std::exception(errmsg.c_str());
+            throw CAndException(errmsg, "InvalidLineError");
         }
         if (llvm::verifyModule(module, &llvm::errs()))
         {

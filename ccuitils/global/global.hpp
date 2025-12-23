@@ -46,7 +46,7 @@ static int ParseGlobal(const std::string &line, LLVMContext &ctx, Module &module
     Type* type = checkForDataType_Declaration(typeStr, ctx);
     if (!type) {
         std::string err = "Invalid data type '" + typeStr + "'.";
-        throw std::exception(err.c_str());
+        throw CAndException(err, "TypeError");
     }
 
     // If the type string ends with '*', create a pointer type
@@ -63,7 +63,7 @@ static int ParseGlobal(const std::string &line, LLVMContext &ctx, Module &module
         init = ConstantFP::get(type, 0.0);
     } else {
         std::string err = "Unsupported type for global variable '" + nameStr + "'.";
-        throw std::exception(err.c_str());
+        throw CAndException(err, "TypeError");
     }
     auto* GV = new GlobalVariable(
         module,

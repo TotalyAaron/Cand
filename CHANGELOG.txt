@@ -1,0 +1,26 @@
+If you have any suggestions or bugs, please report them in the Github repository. thanks ()!!
+
+0.0.3: [
+
+Bug fixes:
+- Fixed the bug where after compiling a program, you cannot compile another one unless you rerun the application.
+
+New features:
+
+- Added array support. {
+  "let int8** some_strings = int8*[2]" for declaring an array of ASCII strings
+  Note: You cannot instantly declare an array with "int8*[2]{...}" yet, it'll be a feature in newer versions.
+ }
+
+- Added array indexing support. {
+  "ret some_strings[1]" to return the second element in the array "some_strings". Indexing goes like: "[0]" for 1st element, "[1]" for 2nd element, etc.
+}
+
+- Added setting variables. {
+  "some_strings[1] = "this is a string"" to set an element (specifically [1] for the 2nd element) to the value "this is a string".
+}
+
+Convenience features:
+- Added terminal-line support, can now run commands directly with arguments passed into the executable: "candc ...<args>..."
+
+]

@@ -3,7 +3,6 @@
 
 // Expression parser / evaluator that generates LLVM IR.
 // variables (loaded from existing AllocaInst in function), auto-promotion.
-// Uses throw_ca_err(std::string) for errors and std::cout for warnings
 
 #include <string>
 #include <vector>
@@ -14,6 +13,7 @@
 #include <functional>
 #include <unordered_map>
 #include <utility>
+#include <optional>
 
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
@@ -24,32 +24,46 @@
 #include <llvm/IR/Value.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/DerivedTypes.h>
+
+#include "../../caexception.h"
 struct VariableInfo
 {
     llvm::Type *type;        // The type of the variable (i32, i32*, i32**, etc.)
     llvm::Type *pointeeType; // Only valid if type is a pointer (what *points to)
+    llvm::ArrayType *arrayType;
     llvm::AllocaInst *allocaInst;
     bool isPointer;
+    bool isArray;
     VariableInfo() : type(nullptr), pointeeType(nullptr),
-                     allocaInst(nullptr), isPointer(false) {}
+                     allocaInst(nullptr), isPointer(false), arrayType(nullptr), isArray(false) {}
 
     // Non-pointer
     VariableInfo(llvm::Type *t, llvm::AllocaInst *al)
         : type(t),
           pointeeType(nullptr),
           allocaInst(al),
-          isPointer(false) {}
+          isPointer(false),
+          arrayType(nullptr), isArray(false) {}
 
     // Pointer
     VariableInfo(llvm::Type *fullPointerType, llvm::Type *elemType, llvm::AllocaInst *al)
         : type(fullPointerType),
           pointeeType(elemType),
           allocaInst(al),
-          isPointer(true) {}
+          isPointer(true),
+          arrayType(nullptr), isArray(false) {}
+
+    VariableInfo(llvm::ArrayType *at, llvm::AllocaInst *al)
+        : type(nullptr),
+        pointeeType(nullptr),
+        arrayType(at),
+        allocaInst(al),
+        isPointer(false),
+        isArray(true) {}
 };
 
 std::vector<std::unordered_map<std::string, VariableInfo>> variables; // scopes
-VariableInfo *lookup(const std::string &name)
+std::optional<VariableInfo> lookup(const std::string &name)
 {
     for (int i = variables.size() - 1; i >= 0; --i)
     {
@@ -57,10 +71,10 @@ VariableInfo *lookup(const std::string &name)
         auto it = scope.find(name);
         if (it != scope.end())
         {
-            return &it->second;
+            return it->second;
         }
     }
-    return nullptr; // not found
+    return std::nullopt; // not found
 }
 
 #include "../caccfg.h"
@@ -68,10 +82,6 @@ VariableInfo *lookup(const std::string &name)
 #include "../fnc/fnc.hpp"
 using namespace llvm;
 bool usingBitCast = false;
-void throw_ca_err(std::string msg)
-{
-    throw std::exception(msg.c_str());
-}
 namespace cand_eval
 {
     // Default integer literal width (use i128 by default)
@@ -81,7 +91,7 @@ namespace cand_eval
     {
         if (name.empty())
         {
-            throw_ca_err("Cannot declare an empty type.");
+            throw CAndException("Cannot declare an empty type.", "TypeError");
             return nullptr;
         }
         if (name.back() == '*')
@@ -106,18 +116,9 @@ namespace cand_eval
             return llvm::Type::getFloatTy(ctx);
         if (name == "float64")
             return llvm::Type::getDoubleTy(ctx);
-        throw_ca_err("Unknown data type '" + name + "'.");
+        throw CAndException("Unknown data type '" + name + "'.", "TypeError");
         return nullptr;
     }
-    /*inline llvm::Type *getTypeFromVariable(const std::string& name, llvm::LLVMContext &ctx)
-    {
-        if (variables.count(name) == 0)
-        {
-            throw_ca_err("Invalid variable '" + name + "'.");
-            return llvm::IntegerType::get(ctx, 1);
-        }
-        return variables[name];
-    }*/
     enum class TokenKind
     {
         Number,
@@ -215,7 +216,8 @@ namespace cand_eval
                 ++i;
                 break;
             default:
-                throw_ca_err(std::string("Tokenizer: unexpected character '") + c + "'");
+                //std::cout << c << "\n";
+                throw CAndException(std::string("Unexpected character '") + c + "'", "SyntaxError");
                 return {}; // unreachable but satisfies compiler
             }
         }
@@ -332,10 +334,10 @@ namespace cand_eval
             {
                 auto e = parseExpression();
                 if (!match(TokenKind::RParen))
-                    throw_ca_err("Expected ')'");
+                    throw CAndException("Expected ')'", "SyntaxError");
                 return e;
             }
-            throw_ca_err("Invalid primary expression");
+            throw CAndException("Invalid primary expression", "SyntaxError");
             return nullptr;
         }
 
@@ -381,7 +383,7 @@ namespace cand_eval
     static llvm::Type *widerIntType(llvm::Type *a, llvm::Type *b)
     {
         if (!a->isIntegerTy() || !b->isIntegerTy())
-            throw_ca_err("widerIntType: non-integer");
+            throw CAndException("Cannot cast on non-integers", "CastError");
         unsigned wa = llvm::cast<llvm::IntegerType>(a)->getBitWidth();
         unsigned wb = llvm::cast<llvm::IntegerType>(b)->getBitWidth();
         unsigned w = (wa > wb) ? wa : wb;
@@ -417,7 +419,7 @@ namespace cand_eval
         }
         catch (...)
         {
-            throw_ca_err("Invalid float literal: " + text);
+            throw CAndException("Invalid float literal: " + text, "CastError");
         }
         return llvm::ConstantFP::get(builder.getDoubleTy(), v);
     }
@@ -435,7 +437,7 @@ namespace cand_eval
                 }
             }
         }
-        throw_ca_err("Unknown variable: " + name);
+        throw CAndException("Unknown variable: " + name, "NotFoundError");
         return nullptr;
     }
     // Find alloca by name inside function and return a loaded value
@@ -445,8 +447,8 @@ namespace cand_eval
         llvm::IRBuilder<> &builder,
         llvm::Module &module)
     {
-        VariableInfo *info = lookup(name);
-        if (!info)
+        std::optional<VariableInfo> info = lookup(name);
+        if (info == std::nullopt)
             return nullptr;
         llvm::Value *alloc = info->allocaInst;
         if (llvm::AllocaInst *alloca_inst = llvm::dyn_cast<llvm::AllocaInst>(alloc))
@@ -469,7 +471,7 @@ namespace cand_eval
                 GV,
                 name + ".load");
         }
-        throw_ca_err("Unknown variable: " + name);
+        throw CAndException("Unknown variable: " + name, "NotFoundError");
         return nullptr;
     }
     // Promote value v to desired type. Handles integer widen/trunc, int<->float conversions.
@@ -506,7 +508,7 @@ namespace cand_eval
         {
             return builder.CreateFPCast(v, desired, "fpcasttmp");
         }
-        throw_ca_err("Unsupported type promotion.");
+        throw CAndException("Unsupported type promotion.", "CastError");
         return nullptr;
     }
     // Determine common type between two values for binary operations
@@ -541,13 +543,8 @@ namespace cand_eval
     // IR generation from AST
     static llvm::Value *generateIR(AST *node, llvm::Function *F, llvm::IRBuilder<> &builder)
     {
-        if (err)
-        {
-            std::cout << "Error before IR generation: " << errMsg << "\n";
-            return nullptr;
-        }
         if (!node)
-            throw_ca_err("generateIR: null AST node");
+            throw CAndException("null AST node", "ASTError");
         switch (node->kind)
         {
         case AST::Kind::Number:
@@ -578,26 +575,16 @@ namespace cand_eval
                 }
                 if (op == '~')
                 {
-                    /*llvm::Value *ptr = generateIR(node->right.get(), F, builder);
-
-                    llvm::AllocaInst *__alloca = dyn_cast<llvm::AllocaInst>(ptr);
-                    if (!__alloca)
-                    {
-                        throw_ca_err("Cannot dereference non-alloca value");
-                        return nullptr;
-                    }
-                    llvm::Type *elemTy = __alloca->getAllocatedType();
-                    return builder.CreateLoad(elemTy, ptr, "deref");*/
                     std::string varName = node->right->name;
-                    VariableInfo *info = lookup(varName);
-                    if (!info)
+                    std::optional<VariableInfo> info = lookup(varName);
+                    if (info == std::nullopt)
                     {
-                        throw_ca_err("Cannot dereference unknown variable/pointer.");
+                        throw CAndException("Cannot dereference unknown variable/pointer.", "NotFoundError");
                         return nullptr;
                     }
                     if (!info->isPointer)
                     {
-                        throw_ca_err("Cannot dereference non-pointer value.");
+                        throw CAndException("Cannot dereference non-pointer value.", "PointerError");
                         return nullptr;
                     }
                     // Load the pointer stored inside the alloca
@@ -611,7 +598,7 @@ namespace cand_eval
                     llvm::Value *v = generateIR(node->right.get(), F, builder);
                     if (!v)
                     {
-                        throw_ca_err("Cannot negate non-value.");
+                        throw CAndException("Cannot negate non-value.", "NumberError");
                         return nullptr;
                     }
                     llvm::Type *ty = v->getType();
@@ -626,7 +613,7 @@ namespace cand_eval
                     }
                     else
                     {
-                        throw_ca_err("Unary - on unsupported type");
+                        throw CAndException("Unary - on unsupported type", "NumberError");
                         return nullptr;
                     }
                 }
@@ -635,13 +622,13 @@ namespace cand_eval
                     // unary plus: just return the operand value
                     return generateIR(node->right.get(), F, builder);
                 }
-                throw_ca_err("Unknown unary operator");
+                throw CAndException("Unknown unary operator", "NumberError");
             }
             llvm::Value *L = generateIR(node->left.get(), F, builder);
             llvm::Value *R = generateIR(node->right.get(), F, builder);
             if (!L || !R)
             {
-                throw_ca_err("Cannot express a non-value as a part of an expression.");
+                throw CAndException("Cannot express a non-value as a part of an expression.", "NumberError");
                 return nullptr;
             }
             llvm::Type *finalTy = commonBinaryType(builder, L, R);
@@ -679,10 +666,10 @@ namespace cand_eval
                     break;
                 }
             }
-            throw_ca_err("Unsupported operator.");
+            throw CAndException("Unsupported operator.", "NumberError");
         }
         }
-        throw_ca_err("Invalid AST node kind");
+        throw CAndException("Invalid AST node kind", "ASTError");
         return nullptr;
     }
     static std::vector<std::string> split(const std::string &s, char delimiter)
@@ -759,7 +746,7 @@ namespace cand_eval
             llvm::Function *callee = mod->getFunction(std::string(match[1]));
             if (!callee)
             {
-                throw_ca_err("No function called '" + std::string(match[1]) + "'.");
+                throw CAndException("No function called '" + std::string(match[1]) + "'.", "NotFoundError");
                 return nullptr;
             }
             // Parse the parameters
@@ -772,7 +759,7 @@ namespace cand_eval
             }
             for (auto *v : paramValues)
                 if (!v)
-                    throw_ca_err("Invalid argument for function call");
+                    throw CAndException("Invalid argument for function call", "ArgumentError");
             llvm::Function::arg_iterator ai = callee->arg_begin();
             for (int i = 0; i < getNumberOfArgumentsInFunction(callee); i++)
             {
@@ -789,6 +776,140 @@ namespace cand_eval
         }
         else
             return nullptr;
+    }
+    struct ParsedArrayType
+    {
+        std::string base;
+        std::vector<std::string> dims;
+        ParsedArrayType() = default;
+    };
+    // returns true if ok, false if malformed
+    static bool parseArrayType(const std::string &input, ParsedArrayType &out)
+    {
+        std::string s = input;
+        ltrim(s);
+        rtrim(s);
+        out = ParsedArrayType{};
+        std::string base;
+        std::vector<std::string> dims;
+        size_t i = 0;
+        size_t n = s.size();
+        // 1. Extract base type everything before first '['
+        while (i < n && s[i] != '[')
+        {
+            base.push_back(s[i]);
+            i++;
+        }
+        if (base.empty())
+        {
+            throw CAndException("Missing base type before array brackets.", "SyntaxError");
+            return false;
+        }
+        ltrim(base);
+        rtrim(base);
+        out.base = base;
+        // Repeatedly parse [number]
+        while (i < n)
+        {
+            if (s[i] != '[')
+            {
+                throw CAndException("Unexpected character '" + std::string(1, s[i]) +
+                      "' after base type '" + base + "'.", "SyntaxError");
+                return false;
+            }
+            i++; // skip [
+            std::string num;
+            while (i < n && s[i] != ']')
+            {
+                if (!std::isspace((unsigned char)s[i]))
+                {
+                    if (!std::isdigit((unsigned char)s[i]))
+                    {
+                        throw CAndException("Array size must be numeric. Offending character: '" +
+                              std::string(1, s[i]) + "'", "SyntaxError");
+                        return false;
+                    }
+                    num.push_back(s[i]);
+                }
+                i++;
+            }
+            if (i >= n)
+            {
+                throw CAndException("Unclosed '[', missing ']'.", "SyntaxError");
+                return false;
+            }
+            if (num.empty())
+            {
+                throw CAndException("Empty array size '[]' is not allowed.", "SyntaxError");
+                return false;
+            }
+            dims.push_back(num);
+            i++; // skip ]
+        }
+        out.dims = dims;
+        return true;
+    }
+    uint64_t getIntValueFromValue(llvm::Value *value)
+    {
+        if (llvm::ConstantInt *CI = llvm::dyn_cast<llvm::ConstantInt>(value))
+        {
+            return CI->getZExtValue();
+        }
+        else if (llvm::ConstantFP *CFP = llvm::dyn_cast<llvm::ConstantFP>(value))
+        {
+            if (W > 2) { std::cout << "Conversion from float to integer, truncating decimal part.\n"; }
+            return static_cast<uint64_t>(CFP->getValueAPF().convertToDouble());
+        }
+        else
+        {
+            throw CAndException("Value is not a numeric constant.", "NumberError"); return 0;
+        }
+    }
+    llvm::ArrayType* evaulateArrayType(const std::string& expr, llvm::LLVMContext& ctx) {
+        if (expr.empty() || expr.back() != ']')
+            return nullptr;
+        ParsedArrayType pat;
+        parseArrayType(expr, pat);
+        llvm::Type* baseType = checkForDataType_Declaration(pat.base, ctx);
+        llvm::ArrayType* arrTy = nullptr;
+        for (int i = pat.dims.size() - 1; i >= 0; --i) {
+            int dim = std::stoi(pat.dims[i]);
+            arrTy = arrTy
+                ? llvm::ArrayType::get(arrTy, dim)
+                : llvm::ArrayType::get(baseType, dim);
+        }
+        return arrTy;
+    }
+    static llvm::Value *evaulateIndexArray(const std::string &expr, llvm::IRBuilder<> &builder, llvm::LLVMContext &ctx) {
+        if (expr.empty() || expr.back() != ']')
+            return nullptr;
+        ParsedArrayType pat = ParsedArrayType();
+        parseArrayType(expr, pat);
+        std::optional<VariableInfo> arrayInfo = lookup(pat.base);
+        if (arrayInfo == std::nullopt) throw CAndException("Unknown variable '" + pat.base + "'.", "NotFoundError");
+        if (!arrayInfo->isArray) throw CAndException(R"(No overloaded operator '[]' can match the argument lists:
+            operator []: extern "C++" | extern "C++.stdlib" internal llvm-private compiled evaluateIndexArray(...)
+        )", "SyntaxError");
+        llvm::Type* type = arrayInfo->arrayType->getElementType();
+        llvm::Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0);
+        std::vector<llvm::Value*> allIndexValues = {zero};
+        for (std::string index : pat.dims) {
+            int i = 0;
+            try {
+                i = std::stoi(index);
+            }
+            catch (...) {
+                throw CAndException("Cannot convert given element to 'int32'", "TypeError");
+                return nullptr;
+            }
+            allIndexValues.push_back(llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), i));
+        }
+        llvm::Value* val = builder.CreateGEP(
+            arrayInfo->arrayType,
+            arrayInfo->allocaInst,
+            allIndexValues
+        );
+        return builder.CreateLoad(arrayInfo->arrayType->getElementType(), val);
     }
     static std::pair<bool, double> IsSingleValue(const std::string &expr)
     {

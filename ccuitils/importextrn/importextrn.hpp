@@ -61,7 +61,7 @@ static inline int ParseImportExtern(std::string &line, LLVMContext &ctx, Module 
         else
         {
             std::string err = "No extern type called '" + std::string(match[1]) + "'.";
-            throw std::exception(err.c_str());
+            throw CAndException(err);
         }
     }
     return 1;

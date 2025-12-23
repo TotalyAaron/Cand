@@ -148,7 +148,7 @@ static int ParseFnc(const std::string &line, LLVMContext &ctx, Module &module, I
     {
         if (is_inside_function)
         {
-            throw std::exception("Cannot declare a function inside of a function.");
+            throw CAndException("Cannot declare a function inside of a function.", "SyntaxError");
         }
         is_inside_function = true;
         scopes.push_back(_TYPE_NESTED_::FNC);
@@ -173,14 +173,14 @@ static int ParseFnc(const std::string &line, LLVMContext &ctx, Module &module, I
             // validate name
             if (!isValidVariableName(nameStr))
             {
-                throw std::exception("Variable name contains illegal characters.");
+                throw CAndException("Variable name contains illegal characters", "VariableNameError");
             }
             // Resolve the type (this returns the LLVM Type* for "int32" or "int32*" etc)
             Type *resolved = checkForDataType_Declaration(typeStr, ctx);
             if (!resolved)
             {
                 std::string err = "Unknown type for parameter '" + nameStr + "' in function '" + std::string(match[1]) + "'";
-                throw std::exception(err.c_str());
+                throw CAndException(err, "TypeError");
             }
             // push into ordered lists
             paramTypes.push_back(resolved);
@@ -191,7 +191,7 @@ static int ParseFnc(const std::string &line, LLVMContext &ctx, Module &module, I
                                ? checkForDataType_Declaration(std::string(match[3]), ctx)
                                : Type::getVoidTy(ctx);
         if (!returnType)
-            throw std::exception("Invalid return type.");
+            throw CAndException("Invalid return type", "TypeError");
 
         FunctionType *fnctype = FunctionType::get(returnType, paramTypes, false);
         Function *function = Function::Create(fnctype, Function::ExternalLinkage, Twine(match[1]), module);
@@ -223,7 +223,7 @@ static int ParseFnc(const std::string &line, LLVMContext &ctx, Module &module, I
                 Type *pointee = checkForDataType_Declaration(typeStr, ctx);
                 if (!pointee)
                 {
-                    throw std::exception("Cannot resolve pointee type for parameter.");
+                    throw CAndException("Cannot resolve pointee type for parameter.", "PointerError");
                 }
                 info = VariableInfo(declType, pointee, alloca);
             }
@@ -246,7 +246,7 @@ static int CheckFunction_isValid(Function &function, raw_os_ostream &out)
 {
     if (verifyFunction(function, &out))
     {
-        throw std::exception("Function failed to build because of a syntax error or other.");
+        throw CAndException("Function failed to build because of a syntax error or other.", "VError");
     }
     return 0;
 }

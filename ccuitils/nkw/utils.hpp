@@ -34,4 +34,36 @@ std::string rtrim(const std::string& s) {
 std::string trim(const std::string& s) {
     return ltrim(rtrim(s));
 }
+#include "../let/evaulate_expr.hpp"
+using namespace llvm;
+void storeValueIntoArray(LLVMContext& ctx, IRBuilder<>& builder, const cand_eval::ParsedArrayType& parsedArrayType, Value* valueToStore, ArrayType* arrTy, AllocaInst* arrAlloca) {
+    llvm::Value* zero = llvm::ConstantInt::get(llvm::Type::getInt32Ty(ctx), 0); // ?????? why 0
+    std::vector<llvm::Value*> allIndexValues = {zero};
+    for (std::string index : parsedArrayType.dims) {
+        long i = 0;
+        try {
+            i = std::stol(index);
+        }
+        catch (...) {
+            throw CAndException("Cannot convert given element to 'int64'", "TypeError");
+            return;
+        }
+        allIndexValues.push_back(llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx), i));
+    }
+    std::hash<std::string> hasher;
+	size_t hashValue = hasher(parsedArrayType.base);
+    llvm::Value* elementPtr = builder.CreateInBoundsGEP(
+        arrTy,           // element type
+        arrAlloca,       // pointer to the array
+        allIndexValues, // indices
+        "array.elem" + Twine(std::to_string(hashValue)) // some Twine name??
+    );
+    auto* gep = cast<GetElementPtrInst>(elementPtr);
+    if (!gep)
+		throw CAndException("Failed to create GEP instruction for array element.", "GEPError");
+    Type* elemTy = gep->getResultElementType();
+	valueToStore = cand_eval::promoteTo(builder, valueToStore, elemTy);
+	builder.CreateStore(valueToStore, elementPtr);
+    return;
+}
 #endif

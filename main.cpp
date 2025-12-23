@@ -31,6 +31,9 @@ llvm::Value *cand_eval::evaluateExpression(std::string expr, llvm::Type *type, l
     llvm::Value *fcres = cand_eval::evaulateFunctionCall(expr, type, builder, ctx);
     if (fcres != nullptr)
         return fcres;
+    llvm::Value *arrIV = cand_eval::evaulateIndexArray(expr, builder, ctx);
+    if (arrIV != nullptr)
+        return arrIV;
     auto tokens = cand_eval::tokenize(expr);
     cand_eval::Parser p(tokens);
     auto root = p.parseExpression();
@@ -89,6 +92,8 @@ int ProjectMode(std::string path)
                 errc = 1;
             }
             std::cout << "[STATUS] Compile exited with error code " << errc << ".\n";
+			is_inside_function = false;
+            scopes.clear();
             continue;
         }
         else if (parts[0] == "exitproj")
@@ -101,15 +106,9 @@ int ProjectMode(std::string path)
     }
     return 0;
 }
-int MainLoop()
-{
-    printf(">> ");
-    std::string input;
-    std::getline(std::cin, input);
-    std::vector<std::string> parts = splitStringBySpace(input);
+int process(std::vector<std::string>& parts) {
     if (parts.size() < 1)
     {
-        std::cout << input << "\n";
         return 0;
     }
     if (parts[0] == "example")
@@ -136,7 +135,7 @@ int MainLoop()
         if (parts.size() < 2)
         {
             std::cout << "Usage: Loads a project.\n"
-                      << "Loads a project with the .caxproj file extension that is created by 'newproj'.\n";
+                << "Loads a project with the .caxproj file extension that is created by 'newproj'.\n";
             return 0;
         }
         if (!std::filesystem::exists(parts[1]))
@@ -169,17 +168,19 @@ int MainLoop()
         {
             errc = compile(parts[1], oplevel, parts[2], parts[3]);
         }
-        catch (const std::exception &e)
+        catch (const std::exception& e)
         {
             std::cout << "Error when compiling: " << e.what() << "\n";
             errc = 1;
         }
         std::cout << "[STATUS] Compile exited with error code " << errc << ".\n";
+        is_inside_function = false;
+        scopes.clear();
         return 0;
     }
     else if (parts[0] == "allVars")
     {
-        for (auto &scope : variables)
+        for (auto& scope : variables)
         {
             for (std::pair<std::string, VariableInfo> alloca : scope)
             {
@@ -190,13 +191,30 @@ int MainLoop()
     }
     else
     {
-        std::cout << "No command named '" << input << "'.\n";
+        std::cout << "No command named '" << parts[0] << "'.\n";
         return 0;
     }
-    return 0;
 }
-int main()
+int MainLoop()
 {
+    printf(">> ");
+    std::string input;
+    std::getline(std::cin, input);
+    std::vector<std::string> parts = splitStringBySpace(input);
+    return process(parts);
+}
+int main(int argc, char** argv)
+{
+	char** argvWithoutFirstArgument = argv + 1; // stupid pointer arithmetic ahh
+	std::vector<std::string> allArgs;
+    for (char** ptr = argvWithoutFirstArgument; *ptr != nullptr; ++ptr) {
+        // Convert each char* to std::string and add to vector
+        allArgs.push_back(std::string(*ptr));
+    }
+    if (!allArgs.empty()) {
+        process(allArgs);
+        return 0;
+    }
     while (1)
     {
         int err = MainLoop();

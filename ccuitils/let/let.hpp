@@ -23,44 +23,47 @@
 #include "../caccfg.h"
 #include "../fnc/fnc.hpp"
 using namespace llvm;
-static int ParseLet(const std::string &line, LLVMContext &ctx, Module &module, IRBuilder<> &builder)
+static int ParseLet(const std::string& line, LLVMContext& ctx, Module& module, IRBuilder<>& builder)
 {
-    std::regex pattern(R"(let\s+(\S+)\s+(\S+)\s*=\s*(.*))"); // Matches regex of type 'let .. .. = <anything>'
+    std::regex pattern(R"(let\s+(\S+)\s+(\S+)\s*=\s*(.*))");
     std::smatch match;
-    if (std::regex_match(line, match, pattern))
+    if (!std::regex_match(line, match, pattern)) return 1;
+    //std::cout << match[1].str() << "\n";
+    //std::cout << match[2].str() << "\n";
+    //std::cout << match[3].str() << "\n";
+    Type* declType = checkForDataType_Declaration(match[1].str(), ctx);
+    if (!declType) throw CAndException("Invalid type.", "TypeError");
+    Function* fn = builder.GetInsertBlock()->getParent();
+    if (ArrayType* arrTy = cand_eval::evaulateArrayType(match[3].str(), ctx))
     {
-        // std::cout << "First token: " << match[1] << "\n";
-        // std::cout << "Second token: " << match[2] << "\n";
-        // std::cout << "Right-hand side: " << match[3] << "\n";
-        Type *type = checkForDataType_Declaration(match[1], ctx);
-        if (!type)
-            throw std::exception("Invalid type.");
-        Function *fn = builder.GetInsertBlock()->getParent();
-        AllocaInst *allocaInstance = allocate_variable(fn, type, match[2].str());
-        Value *variableValue =
-            cand_eval::evaluateExpression(match[3].str(), type, fn, builder, ctx);
-        if (!variableValue)
-            throw std::exception("Invalid expression.");
-        builder.CreateStore(variableValue, allocaInstance);
-        VariableInfo info;
-        if (type->isPointerTy())
-        {
-            // full type is 'type'
-            llvm::Type *baseType = nullptr;
-            // manually extract the base type because opaque pointers can't:
-            std::string t = match[1].str(); // "int32*""
-            while (!t.empty() && t.back() == '*')
-                t.pop_back();
-            baseType = checkForDataType_Declaration(t, ctx);
-            info = VariableInfo(type, baseType, allocaInstance);
-        }
-        else
-        {
-            info = VariableInfo(type, allocaInstance);
-        }
+        // allocate array ONCE (took me a million years to figure out what was wrong with my array :skull:)
+        AllocaInst* allocaInstance =
+            builder.CreateAlloca(arrTy, nullptr, match[2].str());
+        VariableInfo info(arrTy, allocaInstance);
+        info.isArray = true;
         variables.back()[match[2].str()] = info;
-        return 0; // didn't actually take me long
+        return 0;
     }
-    return 1;
+    AllocaInst* allocaInstance = allocate_variable(fn, declType, match[2].str());
+    Value* rhsValue = cand_eval::evaluateExpression(match[3].str(), declType, fn, builder, ctx);
+    if (!rhsValue) throw CAndException("Invalid expression.", "ExpressionError");
+    builder.CreateStore(rhsValue, allocaInstance);
+    VariableInfo info;
+    if (declType->isPointerTy())
+    {
+        std::string t = match[1].str();
+        while (!t.empty() && t.back() == '*')
+            t.pop_back();
+
+        Type* baseType = checkForDataType_Declaration(t, ctx);
+        info = VariableInfo(declType, baseType, allocaInstance);
+    }
+    else
+    {
+        info = VariableInfo(declType, allocaInstance);
+    }
+    variables.back()[match[2].str()] = info;
+    return 0;
 }
+
 #endif
