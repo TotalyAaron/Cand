@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html>
+  <body>
+    <a href="gethomeloc()">Back to home</a>
+    <label for="searchquestions">Search questions<br></label>
+    <input type="text" id="inputquestion" placeholder="e.g. 'my_question'"></input>
+    <button id="inputbutton">Search</button>
+    <p id="output"></p>
+  </body>
+  <script src="database.js"></script>
+  <script>
+    const windowloc = window.location.href
+    function gethomeloc() {
+      return windowloc.substring(0, windowloc.lastIndexOf('/'));
+    }
+    const input = document.getElementById("inputquestion");
+    const button = document.getElementById("inputbutton");
+    button.addEventListener("click", getNote(input.value));
+  </script>
+</html>
