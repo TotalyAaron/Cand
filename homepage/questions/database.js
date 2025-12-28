@@ -8,7 +8,7 @@ async function addNote(text) {
   document.getElementById("output").innerText = data.message;
 }
 async function getNote(noteid) {
-  console.log("Getting note: " + noteid);
+  alert("Getting note: " + noteid);
   document.getElementById("inputquestion").placeholder = noteid;
   const res = await fetch("/api/notes", {
     method: "GET",
@@ -16,10 +16,11 @@ async function getNote(noteid) {
     body: JSON.stringify({ id: noteid })
   });
   const notes = await res.json();
+  alert(notes);
   const data = "";
   for (const note of notes) {
     data += JSON.stringify(note, null, 2) + "\n";
   }
-  console.log("Data got: " + data);
+  alert("Data got: " + data);
   document.getElementById("output").innerText = data;
 }
