@@ -17,9 +17,9 @@ async function getNote(noteid) {
   const notes = await res.json();
   alert(notes);
   const data = "";
-  for (const note of notes) {
-    data += JSON.stringify(note, null, 2) + "\n";
-  }
+  notes.forEach(note => {
+    data += note.text + "\n";
+  });
   alert("Data got: " + data);
   document.getElementById("output").innerText = data;
 }
