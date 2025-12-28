@@ -10,10 +10,9 @@ async function addNote(text) {
 async function getNote(noteid) {
   alert("Getting note: " + noteid);
   document.getElementById("inputquestion").placeholder = noteid;
-  const res = await fetch("/api/notes", {
+  const res = await fetch(`/api/notes?id=${encodeURIComponent(noteid)}`, {
     method: "GET",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: noteid })
+    headers: { "Content-Type": "application/json" }
   });
   const notes = await res.json();
   alert(notes);
