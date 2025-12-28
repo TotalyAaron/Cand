@@ -1,4 +1,7 @@
-const webpath = "https://totalyaaron.github.io/Cand/homepage";
+const webpath = "";
+document.addEventListener('DOMContentLoaded', function() {
+  webpath = window.location.href;
+});
 function home() {
   window.location.href = webpath;
 }
