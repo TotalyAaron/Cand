@@ -7,7 +7,7 @@ async function addNote(text) {
   const data = await res.json();
   document.getElementById("output").innerText = data.message;
 }
-async function getNote(noteid) {
+async function getNote(noteid, ..optionalData) {
   console.log("Getting note: " + noteid);
   document.getElementById("inputquestion").placeholder = noteid;
   const res = await fetch("/api/notes", {
