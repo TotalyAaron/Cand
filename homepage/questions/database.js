@@ -18,6 +18,6 @@ async function getNote(noteid) {
   alert(JSON.stringify(notes));
   //const data = "";
   notes.forEach(note => {
-    document.getElementById("output").innerText += note + "\n";
+    document.getElementById("output").innerText += note.text + "\n";
   });
 }
