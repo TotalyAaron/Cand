@@ -5,3 +5,6 @@ document.addEventListener('DOMContentLoaded', function() {
 function home() {
   window.location.href = webpath;
 }
+function questions() {
+  window.location.href = "https://cand-seven.vercel.app";
+}
